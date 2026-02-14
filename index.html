@@ -55,6 +55,30 @@
             border-color: #3b82f6;
         }
 
+        /* Nav Tabs */
+        .nav-tab {
+            position: relative;
+            color: #94a3b8;
+            transition: all 0.2s;
+        }
+        .nav-tab:hover { color: #e2e8f0; }
+        .nav-tab.active { color: white; }
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -18px; /* Align with header bottom */
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: currentColor;
+            border-top-left-radius: 2px;
+            border-top-right-radius: 2px;
+        }
+        /* Mode Specific Highlights */
+        .nav-tab.mode-bridge.active { color: #60a5fa; } /* Blue */
+        .nav-tab.mode-tunnel.active { color: #fbbf24; } /* Amber */
+        .nav-tab.mode-highway.active { color: #34d399; } /* Emerald */
+
         /* Modal Styles */
         .modal-backdrop {
             display: none;
@@ -82,35 +106,35 @@
             0% { opacity: 0; transform: scale(0.95); }
             100% { opacity: 1; transform: scale(1); }
         }
-
-        /* Pattern Generation for Tunnel/Ground */
-        .pattern-soil {
-            background-color: #3f2e26;
-            background-image: repeating-linear-gradient(45deg, #4a3b32 25%, transparent 25%, transparent 75%, #4a3b32 75%, #4a3b32), repeating-linear-gradient(45deg, #4a3b32 25%, #3f2e26 25%, #3f2e26 75%, #4a3b32 75%, #4a3b32);
-            background-position: 0 0, 10px 10px;
-            background-size: 20px 20px;
-        }
     </style>
 </head>
 <body class="h-screen w-screen flex flex-col">
 
     <!-- Header -->
     <header class="h-14 border-b border-slate-700 bg-slate-900 flex items-center justify-between px-4 shrink-0 z-20">
-        <div class="flex items-center gap-3">
-            <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold text-white tracking-tighter">
-                IS
+        <div class="flex items-center gap-6">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold text-white tracking-tighter">
+                    IS
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold tracking-wide text-white">INFRASTRUCT</h1>
+                    <p class="text-[10px] text-slate-400 uppercase tracking-widest">Topology Design</p>
+                </div>
             </div>
-            <div>
-                <h1 class="text-sm font-bold tracking-wide text-white">INFRASTRUCT</h1>
-                <p class="text-[10px] text-slate-400 uppercase tracking-widest">Topology Design & Analysis</p>
+            
+            <!-- Workspace Tabs -->
+            <div class="h-14 flex items-center gap-6 ml-6 border-l border-slate-700 pl-6">
+                <button onclick="switchWorkspace('bridge')" id="tab-bridge" class="nav-tab mode-bridge active flex items-center gap-2 text-xs font-bold tracking-wide">
+                    <i class="fas fa-archway"></i> BRIDGE
+                </button>
+                <button onclick="switchWorkspace('tunnel')" id="tab-tunnel" class="nav-tab mode-tunnel flex items-center gap-2 text-xs font-bold tracking-wide">
+                    <i class="fas fa-dungeon"></i> TUNNEL
+                </button>
+                <button onclick="switchWorkspace('highway')" id="tab-highway" class="nav-tab mode-highway flex items-center gap-2 text-xs font-bold tracking-wide">
+                    <i class="fas fa-road"></i> HIGHWAY
+                </button>
             </div>
-        </div>
-
-        <!-- Mode Selector -->
-        <div class="flex bg-slate-800 rounded p-1 gap-1">
-            <button onclick="setMode('bridge')" id="mode-bridge" class="px-3 py-1 text-[10px] font-bold rounded bg-slate-700 text-white transition">BRIDGE</button>
-            <button onclick="setMode('tunnel')" id="mode-tunnel" class="px-3 py-1 text-[10px] font-bold rounded hover:bg-slate-700 text-slate-400 transition">TUNNEL</button>
-            <button onclick="setMode('highway')" id="mode-highway" class="px-3 py-1 text-[10px] font-bold rounded hover:bg-slate-700 text-slate-400 transition">HIGHWAY</button>
         </div>
         
         <div class="flex items-center gap-4">
@@ -121,8 +145,8 @@
             <button onclick="toggleModal()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-600 transition" title="Technical Manifest">
                 <i class="fas fa-info-circle"></i> Info
             </button>
-            <button onclick="resetModel()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-600 transition">
-                Reset
+            <button onclick="resetCurrentWorkspace()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-600 transition">
+                Reset Workspace
             </button>
         </div>
     </header>
@@ -161,9 +185,10 @@
             
             <!-- Overlay Info -->
             <div class="absolute bottom-4 left-4 pointer-events-none">
-                <div class="text-[10px] text-slate-500 font-mono">
+                <div class="text-[10px] text-slate-500 font-mono bg-slate-900/80 p-2 rounded border border-slate-800">
+                    <span id="workspace-label" class="font-bold text-white mb-1 block">BRIDGE WORKSPACE</span>
                     GRID: 1m | SCALE: 1:100<br>
-                    SOLVER: FEM (Stiffness Matrix 1D + UDL)
+                    SOLVER: Matrix Stiffness + UDL
                 </div>
             </div>
         </main>
@@ -226,47 +251,47 @@
             <div class="flex justify-between items-start mb-4 border-b border-slate-700 pb-4">
                 <div>
                     <h2 class="text-lg font-bold text-white tracking-wide">INFRASTRUCT <span class="text-slate-500 font-normal">| Technical Manifest</span></h2>
-                    <p class="text-[10px] text-blue-400 font-mono mt-1 uppercase tracking-wider">v2.0.1 | Multi-Mode Design Engine</p>
+                    <p class="text-[10px] text-blue-400 font-mono mt-1 uppercase tracking-wider">v3.0.0 | Integrated Workspaces</p>
                 </div>
                 <button onclick="toggleModal()" class="text-slate-400 hover:text-white transition"><i class="fas fa-times"></i></button>
             </div>
             
             <div class="space-y-5 text-sm text-slate-300">
                 <section>
-                    <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2"><i class="fas fa-layer-group"></i> Design Modes</h3>
+                    <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2"><i class="fas fa-layer-group"></i> Workspace Architecture</h3>
+                    <p class="mb-2 text-xs leading-relaxed text-slate-400">This application features three persistent workspaces. Data is isolated per workspace, allowing for simultaneous multi-context design.</p>
                     <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
-                        <div class="bg-slate-800 p-2 rounded border border-slate-700">
+                        <div class="bg-slate-800 p-2 rounded border border-blue-500/30">
                             <i class="fas fa-archway text-lg text-blue-400 mb-1"></i>
                             <div class="font-bold text-slate-200">BRIDGE</div>
-                            <div class="text-slate-500">Continuous Span</div>
+                            <div class="text-slate-500">Continuous Span & Airspace</div>
                         </div>
-                        <div class="bg-slate-800 p-2 rounded border border-slate-700">
-                            <i class="fas fa-dungeon text-lg text-amber-600 mb-1"></i>
+                        <div class="bg-slate-800 p-2 rounded border border-amber-500/30">
+                            <i class="fas fa-dungeon text-lg text-amber-500 mb-1"></i>
                             <div class="font-bold text-slate-200">TUNNEL</div>
-                            <div class="text-slate-500">Roof Analysis</div>
+                            <div class="text-slate-500">Overburden & Roof Loads</div>
                         </div>
-                        <div class="bg-slate-800 p-2 rounded border border-slate-700">
+                        <div class="bg-slate-800 p-2 rounded border border-emerald-500/30">
                             <i class="fas fa-road text-lg text-emerald-500 mb-1"></i>
                             <div class="font-bold text-slate-200">HIGHWAY</div>
-                            <div class="text-slate-500">Pavement Slab</div>
+                            <div class="text-slate-500">Pavement & Subgrade</div>
                         </div>
                     </div>
                 </section>
 
                 <section>
                     <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2"><i class="fas fa-microchip"></i> Calculation Engine</h3>
-                    <p class="mb-2 text-xs leading-relaxed text-slate-400">Uses a <strong>Matrix Stiffness Method</strong> enhanced for Uniformly Distributed Loads (UDL).</p>
                     <div class="bg-slate-800/50 p-3 rounded border border-slate-700/50">
                         <ul class="list-disc pl-4 space-y-1 text-slate-400 text-[10px]">
-                            <li><strong>Point Loads:</strong> Modeled as nodal forces.</li>
-                            <li><strong>Natural Weights (UDL):</strong> Modeled using Fixed End Moments (FEM).</li>
-                            <li><strong>Eq:</strong> <code class="text-blue-400">w (kN/m) = Density (kN/m³) × Width × Depth</code></li>
+                            <li><strong>FEM Solver:</strong> 1D Matrix Stiffness Method.</li>
+                            <li><strong>State Management:</strong> Context switching saves topology to local session memory.</li>
+                            <li><strong>UDL Logic:</strong> <code class="text-blue-400">Load = Density × Section Metrics</code></li>
                         </ul>
                     </div>
                 </section>
 
                 <div class="mt-4 pt-4 border-t border-slate-700 flex justify-end">
-                    <button onclick="toggleModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded text-xs font-bold transition shadow-lg shadow-blue-500/20">Acknowledge & Begin</button>
+                    <button onclick="toggleModal()" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2 rounded text-xs font-bold transition shadow-lg shadow-blue-500/20">Enter Workspaces</button>
                 </div>
             </div>
         </div>
@@ -283,31 +308,46 @@
         const PIXELS_PER_METER = 40;
         
         let currentTool = 'select'; // select, load, support
-        let currentMode = 'bridge'; // bridge, tunnel, highway
+        let activeWorkspace = 'bridge'; // bridge, tunnel, highway
         let selectedObject = null;
         let isDragging = false;
         let showDiagrams = true;
 
-        // Model Data
-        let beamLength = 20; // meters
-        let supports = [];   // { id, x (m), type: 'pin'|'roller' }
-        let loads = [];      // { id, x (m), magnitude (kN), type: 'point' }
-        
-        // Distributed Load (Natural Weight / Geology)
-        let distributedLoad = 0; // kN/m
-        
-        // Calculator Params (Preserved between modes)
-        let calcParams = {
-            bridge: { density: 24, area: 0.5 }, // Concrete 24kN/m3, 0.5m2 section
-            tunnel: { density: 18, depth: 5 },  // Soil 18kN/m3, 5m deep
-            highway: { density: 22, thickness: 0.3 } // Asphalt 22kN/m3, 30cm
+        // --- MULTI-WORKSPACE DATA MODEL ---
+        // Each workspace has independent topology and calculation parameters
+        const workspaces = {
+            bridge: {
+                supports: [],
+                loads: [],
+                calcParams: { density: 24, area: 0.5 }, // Concrete 24kN/m3, 0.5m2
+                distributedLoad: 0
+            },
+            tunnel: {
+                supports: [],
+                loads: [],
+                calcParams: { density: 18, depth: 5 }, // Soil 18kN/m3, 5m deep
+                distributedLoad: 0
+            },
+            highway: {
+                supports: [],
+                loads: [],
+                calcParams: { density: 22, thickness: 0.3 }, // Asphalt 22kN/m3, 0.3m
+                distributedLoad: 0
+            }
         };
+
+        // Active Pointers (Reference the current workspace data for easier access)
+        let supports = [];
+        let loads = [];
+        let calcParams = {};
+        let distributedLoad = 0;
         
-        // System Parameters
-        let soilCapacity = 200; // kPa
-        let footingArea = 1.0;  // m^2
-        let EI = 20000;         // kNm^2
-        let maxShearCapacity = 150; // kN
+        // System Parameters (Global for simplicity, but could be per workspace)
+        let beamLength = 20; 
+        let soilCapacity = 200; 
+        let footingArea = 1.0;  
+        let EI = 20000;         
+        let maxShearCapacity = 150; 
 
         // Analysis Results
         let reactions = {};
@@ -319,7 +359,12 @@
         function init() {
             window.addEventListener('resize', resizeCanvas);
             resizeCanvas();
-            resetModel();
+            
+            // Initialize default data for all workspaces
+            initDefaultData();
+            
+            // Load Bridge by default
+            switchWorkspace('bridge');
             
             // Event Listeners
             canvas.addEventListener('mousedown', handleMouseDown);
@@ -327,36 +372,73 @@
             canvas.addEventListener('mouseup', handleMouseUp);
             canvas.addEventListener('dblclick', handleDoubleClick);
             
-            // Start Loop
             requestAnimationFrame(animate);
         }
 
-        function setMode(mode) {
-            currentMode = mode;
-            // Visual Update
-            ['bridge', 'tunnel', 'highway'].forEach(m => {
-                const btn = document.getElementById(`mode-${m}`);
-                if(m === mode) {
-                    btn.className = "px-3 py-1 text-[10px] font-bold rounded bg-slate-700 text-white transition ring-1 ring-blue-500";
-                } else {
-                    btn.className = "px-3 py-1 text-[10px] font-bold rounded hover:bg-slate-700 text-slate-400 transition";
-                }
-            });
-            
-            // Recalculate based on default mode params
-            updateCalculator();
-            updateAnalysis();
-        }
-
-        function resetModel() {
-            supports = [
+        function initDefaultData() {
+            // Bridge: Standard Span
+            workspaces.bridge.supports = [
                 { id: generateId(), x: 2, type: 'pin' },
                 { id: generateId(), x: 18, type: 'roller' }
             ];
-            loads = [
+            workspaces.bridge.loads = [
                 { id: generateId(), x: 10, magnitude: 50, type: 'point' }
             ];
-            setMode(currentMode);
+
+            // Tunnel: Continuous support on sides, load overhead
+            workspaces.tunnel.supports = [
+                { id: generateId(), x: 0, type: 'pin' },
+                { id: generateId(), x: 5, type: 'pin' },
+                { id: generateId(), x: 15, type: 'pin' },
+                { id: generateId(), x: 20, type: 'pin' }
+            ];
+            // Tunnel calculation handled by UDL
+
+            // Highway: Continuous subgrade (simulated by many supports)
+            workspaces.highway.supports = [];
+            for(let i=0; i<=20; i+=2) {
+                workspaces.highway.supports.push({ id: generateId(), x: i, type: 'pin' });
+            }
+            workspaces.highway.loads = [
+                { id: generateId(), x: 5, magnitude: 80, type: 'point' }, // Truck axle
+                { id: generateId(), x: 7, magnitude: 80, type: 'point' }  // Truck axle
+            ];
+        }
+
+        function switchWorkspace(mode) {
+            // 1. Switch Active State Name
+            activeWorkspace = mode;
+            
+            // 2. Point active arrays to the workspace data
+            supports = workspaces[mode].supports;
+            loads = workspaces[mode].loads;
+            calcParams = workspaces[mode].calcParams;
+            
+            // 3. Update UI Tabs
+            document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${mode}`).classList.add('active');
+            
+            // 4. Update Label
+            document.getElementById('workspace-label').innerText = `${mode.toUpperCase()} WORKSPACE`;
+            
+            // 5. Trigger Calculations & UI Refresh
+            updateCalcLogic(false); // Recalc UDL based on stored params
+            updateUI();
+        }
+
+        function resetCurrentWorkspace() {
+            if(activeWorkspace === 'bridge') {
+                workspaces.bridge.supports = [{ id: generateId(), x: 2, type: 'pin' }, { id: generateId(), x: 18, type: 'roller' }];
+                workspaces.bridge.loads = [{ id: generateId(), x: 10, magnitude: 50, type: 'point' }];
+            } else if(activeWorkspace === 'tunnel') {
+                workspaces.tunnel.supports = [{ id: generateId(), x: 0, type: 'pin' }, { id: generateId(), x: 20, type: 'pin' }];
+                workspaces.tunnel.loads = [];
+            } else {
+                 workspaces.highway.supports = [{ id: generateId(), x: 0, type: 'pin' }, { id: generateId(), x: 20, type: 'pin' }];
+                 workspaces.highway.loads = [];
+            }
+            // Refresh pointers
+            switchWorkspace(activeWorkspace);
         }
 
         function resizeCanvas() {
@@ -368,11 +450,10 @@
             draw();
         }
 
-        // --- SOLVER ENGINE (FEM + UDL) ---
+        // --- SOLVER ENGINE (Identical to v2 but uses pointer arrays) ---
         function updateAnalysis() {
             supports.sort((a, b) => a.x - b.x);
             
-            // Nodes from supports and point loads
             let nodes = new Set([0, beamLength]);
             supports.forEach(s => nodes.add(s.x));
             loads.forEach(l => nodes.add(l.x));
@@ -383,19 +464,14 @@
             let K = new Float64Array(nDof * nDof);
             let F = new Float64Array(nDof);
             
-            // 1. Build Stiffness Matrix & 2. Apply UDL Fixed End Forces
             for (let i = 0; i < nNodes - 1; i++) {
                 const start = sortedNodes[i];
                 const end = sortedNodes[i+1];
                 const L = end - start;
-                
                 if (L < 0.001) continue;
                 
-                // Element Stiffness
                 const k = (EI) / (L * L * L);
                 const k11=12*k, k12=6*k*L, k22=4*k*L*L, k23=-6*k*L, k24=2*k*L*L;
-                
-                // DOF Indices
                 const i1 = i*2, i2 = i*2+1, i3 = (i+1)*2, i4 = (i+1)*2+1;
                 
                 addK(K, nDof, i1, i1, k11); addK(K, nDof, i1, i2, k12); addK(K, nDof, i1, i3, -k11); addK(K, nDof, i1, i4, k12);
@@ -403,116 +479,59 @@
                 addK(K, nDof, i3, i1, -k11); addK(K, nDof, i3, i2, k23); addK(K, nDof, i3, i3, k11); addK(K, nDof, i3, i4, -k12);
                 addK(K, nDof, i4, i1, k12); addK(K, nDof, i4, i2, k24); addK(K, nDof, i4, i3, -k12); addK(K, nDof, i4, i4, k22);
 
-                // UDL Fixed End Forces (w*L^2/12 etc)
-                // UDL acts DOWN (-y).
-                // Force at nodes: -wL/2
-                // Moment at nodes: -wL^2/12 (left), +wL^2/12 (right)
                 if (distributedLoad !== 0) {
                     const w = distributedLoad;
                     const f_node = -w * L / 2;
                     const m_node = w * L * L / 12;
-                    
-                    F[i1] += f_node;
-                    F[i2] += -m_node;
-                    F[i3] += f_node;
-                    F[i4] += m_node;
+                    F[i1] += f_node; F[i2] += -m_node; F[i3] += f_node; F[i4] += m_node;
                 }
             }
 
-            // 3. Apply Point Loads
             loads.forEach(l => {
                 const nodeIdx = sortedNodes.indexOf(l.x);
                 if (nodeIdx !== -1) F[nodeIdx * 2] -= l.magnitude;
             });
 
-            // 4. Boundary Conditions (Penalty Method)
             const penalty = 1e16;
             supports.forEach(s => {
                 const nodeIdx = sortedNodes.indexOf(s.x);
                 if (nodeIdx !== -1) K[(nodeIdx*2)*nDof + (nodeIdx*2)] += penalty;
             });
 
-            // 5. Solve
             const displacements = solveLinearSystem(K, F, nDof);
             
-            // 6. Compute Reactions & Diagrams
             reactions = {};
-            // For simple reaction extraction in this method, we sum forces at node or use K*u.
-            // Using Sum of Forces check is robust for simple visualizer.
-            // Reaction R at support = ShearRight - ShearLeft (at support location)
-            // But we need diagrams first.
-            
             shearData = [];
             momentData = [];
             const segments = 200;
             const dx = beamLength / segments;
 
-            // To get accurate reactions with UDL + Point Loads + Indeterminacy,
-            // we use the calculated displacements to find element end forces, then sum.
-            // Or simplified: We trust the FEA displacements and back-calculate element forces.
-            // Element Force vector {f} = [k]{u} + {f_fixed_end}
-            
-            // Let's perform full scan for diagrams
-            // We need a separate pass to determine Reactions from Stiffness.
             supports.forEach(s => {
                 const nodeIdx = sortedNodes.indexOf(s.x);
-                // Approx Reaction = Stiffness * Displacement (since we used Penalty)
                 reactions[s.id] = -1 * displacements[nodeIdx*2] * penalty; 
             });
 
             for (let i = 0; i <= segments; i++) {
                 const x = i * dx;
-                let V = 0;
-                let M = 0;
-                
-                // Supports (Upward)
-                supports.forEach(s => {
-                    if (s.x <= x) {
-                        let R = reactions[s.id]; 
-                        V += R;
-                        M += R * (x - s.x);
-                    }
-                });
-                
-                // Point Loads (Downward)
-                loads.forEach(l => {
-                    if (l.x <= x) {
-                        V -= l.magnitude;
-                        M -= l.magnitude * (x - l.x);
-                    }
-                });
-
-                // Distributed Load (Downward)
-                // Total load to left of x = w * x. Centroid at x/2.
-                if (distributedLoad !== 0) {
-                    const w = distributedLoad;
-                    const loadTotal = w * x;
-                    V -= loadTotal;
-                    M -= loadTotal * (x/2); // Moment arm from x is x/2
-                }
-
+                let V = 0; let M = 0;
+                supports.forEach(s => { if (s.x <= x) { let R = reactions[s.id]; V += R; M += R * (x - s.x); } });
+                loads.forEach(l => { if (l.x <= x) { V -= l.magnitude; M -= l.magnitude * (x - l.x); } });
+                if (distributedLoad !== 0) { const w = distributedLoad; const loadTotal = w * x; V -= loadTotal; M -= loadTotal * (x/2); }
                 shearData.push({x, v: V});
                 momentData.push({x, m: M});
             }
-
             checkErrors();
         }
 
         function checkErrors() {
             designErrors = [];
-            
             supports.forEach(s => {
                 const R = reactions[s.id];
                 const stress = Math.abs(R) / footingArea;
-                if (stress > soilCapacity) {
-                    designErrors.push(`Support at ${s.x.toFixed(1)}m: Bearing Failure (${stress.toFixed(0)} > ${soilCapacity} kPa)`);
-                }
+                if (stress > soilCapacity) designErrors.push(`Support at ${s.x.toFixed(1)}m: Bearing Failure (${stress.toFixed(0)} > ${soilCapacity} kPa)`);
             });
-
             const maxV = Math.max(...shearData.map(d => Math.abs(d.v)));
-            if (maxV > maxShearCapacity) {
-                designErrors.push(`Shear Failure (${maxV.toFixed(0)} > ${maxShearCapacity} kN)`);
-            }
+            if (maxV > maxShearCapacity) designErrors.push(`Shear Failure (${maxV.toFixed(0)} > ${maxShearCapacity} kN)`);
             if (supports.length < 2) designErrors.push("Instability: Less than 2 supports.");
         }
 
@@ -522,18 +541,14 @@
             for (let k = 0; k < n - 1; k++) {
                 for (let i = k + 1; i < n; i++) {
                     const factor = A[i * n + k] / A[k * n + k];
-                    for (let j = k; j < n; j++) {
-                        A[i * n + j] -= factor * A[k * n + j];
-                    }
+                    for (let j = k; j < n; j++) { A[i * n + j] -= factor * A[k * n + j]; }
                     b[i] -= factor * b[k];
                 }
             }
             const x = new Float64Array(n);
             for (let i = n - 1; i >= 0; i--) {
                 let sum = b[i];
-                for (let j = i + 1; j < n; j++) {
-                    sum -= A[i * n + j] * x[j];
-                }
+                for (let j = i + 1; j < n; j++) { sum -= A[i * n + j] * x[j]; }
                 x[i] = sum / A[i * n + i];
             }
             return x;
@@ -553,48 +568,46 @@
             const panel = document.getElementById('calc-panel');
             let content = '';
             
-            if (currentMode === 'bridge') {
+            // Generate Input Fields based on active Workspace Params
+            if (activeWorkspace === 'bridge') {
                 content = `
                     <div class="text-[10px] text-slate-400 mb-1">Structure Self-Weight</div>
                     <div class="grid grid-cols-2 gap-2 mb-2">
                         <div>
                             <label class="text-[9px] text-slate-500">Density (kN/m³)</label>
-                            <input type="number" value="${calcParams.bridge.density}" onchange="calcParams.bridge.density=this.value; updateCalcLogic()" class="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs">
+                            <input type="number" value="${calcParams.density}" onchange="calcParams.density=this.value; updateCalcLogic()" class="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs text-white">
                         </div>
                         <div>
                             <label class="text-[9px] text-slate-500">Area (m²)</label>
-                            <input type="number" value="${calcParams.bridge.area}" onchange="calcParams.bridge.area=this.value; updateCalcLogic()" class="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs">
+                            <input type="number" value="${calcParams.area}" onchange="calcParams.area=this.value; updateCalcLogic()" class="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs text-white">
                         </div>
-                    </div>
-                `;
-            } else if (currentMode === 'tunnel') {
+                    </div>`;
+            } else if (activeWorkspace === 'tunnel') {
                 content = `
                     <div class="text-[10px] text-slate-400 mb-1">Geology Overburden</div>
                     <div class="grid grid-cols-2 gap-2 mb-2">
                         <div>
                             <label class="text-[9px] text-slate-500">Soil (kN/m³)</label>
-                            <input type="number" value="${calcParams.tunnel.density}" onchange="calcParams.tunnel.density=this.value; updateCalcLogic()" class="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs">
+                            <input type="number" value="${calcParams.density}" onchange="calcParams.density=this.value; updateCalcLogic()" class="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs text-white">
                         </div>
                         <div>
                             <label class="text-[9px] text-slate-500">Depth (m)</label>
-                            <input type="number" value="${calcParams.tunnel.depth}" onchange="calcParams.tunnel.depth=this.value; updateCalcLogic()" class="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs">
+                            <input type="number" value="${calcParams.depth}" onchange="calcParams.depth=this.value; updateCalcLogic()" class="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs text-white">
                         </div>
-                    </div>
-                `;
-            } else if (currentMode === 'highway') {
+                    </div>`;
+            } else if (activeWorkspace === 'highway') {
                 content = `
                     <div class="text-[10px] text-slate-400 mb-1">Pavement Section</div>
                     <div class="grid grid-cols-2 gap-2 mb-2">
                         <div>
                             <label class="text-[9px] text-slate-500">Mat (kN/m³)</label>
-                            <input type="number" value="${calcParams.highway.density}" onchange="calcParams.highway.density=this.value; updateCalcLogic()" class="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs">
+                            <input type="number" value="${calcParams.density}" onchange="calcParams.density=this.value; updateCalcLogic()" class="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs text-white">
                         </div>
                         <div>
                             <label class="text-[9px] text-slate-500">Thick (m)</label>
-                            <input type="number" value="${calcParams.highway.thickness}" onchange="calcParams.highway.thickness=this.value; updateCalcLogic()" class="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs">
+                            <input type="number" value="${calcParams.thickness}" onchange="calcParams.thickness=this.value; updateCalcLogic()" class="w-full bg-slate-900 border border-slate-700 rounded px-1 py-1 text-xs text-white">
                         </div>
-                    </div>
-                `;
+                    </div>`;
             }
 
             content += `
@@ -604,23 +617,32 @@
                 </div>
             `;
             panel.innerHTML = content;
-            updateCalcLogic();
         }
 
-        function updateCalcLogic() {
+        function updateCalcLogic(triggerAnalysis = true) {
             let val = 0;
-            if (currentMode === 'bridge') val = calcParams.bridge.density * calcParams.bridge.area;
-            if (currentMode === 'tunnel') val = calcParams.tunnel.density * calcParams.tunnel.depth; // 1m width strip
-            if (currentMode === 'highway') val = calcParams.highway.density * calcParams.highway.thickness; // 1m width strip
+            if (activeWorkspace === 'bridge') val = calcParams.density * calcParams.area;
+            if (activeWorkspace === 'tunnel') val = calcParams.density * calcParams.depth;
+            if (activeWorkspace === 'highway') val = calcParams.density * calcParams.thickness;
             
             distributedLoad = val;
-            document.getElementById('calc-result').innerText = val.toFixed(1) + " kN/m";
-            updateAnalysis();
-            updateUI();
+            workspaces[activeWorkspace].distributedLoad = val; // Store result
+            
+            const resDisplay = document.getElementById('calc-result');
+            if(resDisplay) resDisplay.innerText = val.toFixed(1) + " kN/m";
+            
+            if(triggerAnalysis) {
+                updateAnalysis();
+                updateUI();
+            }
         }
 
         function updateUI() {
-            // Contextual Logic for Props Panel
+            // Refresh Calculator HTML to ensure values match current workspace
+            updateCalculator();
+            document.getElementById('calc-result').innerText = distributedLoad.toFixed(1) + " kN/m";
+
+            // Props Panel
             const panel = document.getElementById('properties-panel');
             if (selectedObject) {
                  if (selectedObject.type === 'load') {
@@ -711,30 +733,23 @@
             const beamY = midY + GROUND_Y_OFFSET;
 
             // DRAW CONTEXT BASED ON MODE
-            if (currentMode === 'tunnel') {
-                // Draw Ground Overburden (Hatch Pattern simulated)
-                const depth = calcParams.tunnel.depth * PIXELS_PER_METER;
+            if (activeWorkspace === 'tunnel') {
+                const depth = calcParams.depth * PIXELS_PER_METER;
                 ctx.fillStyle = '#1e1b18'; // Dark earth
                 ctx.fillRect(0, 0, width, beamY);
-                // Draw layers
                 ctx.fillStyle = 'rgba(255,255,255,0.02)';
                 for(let i=0; i<beamY; i+=20) ctx.fillRect(0, i, width, 1);
             } 
-            else if (currentMode === 'highway') {
-                // Draw Pavement layers below
-                const thick = calcParams.highway.thickness * PIXELS_PER_METER * 10; // Exaggerate
+            else if (activeWorkspace === 'highway') {
+                const thick = calcParams.thickness * PIXELS_PER_METER * 10; 
                 ctx.fillStyle = '#334155';
                 ctx.fillRect(startX, beamY, beamLength * PIXELS_PER_METER, thick);
-                ctx.fillStyle = '#475569'; // Base course
+                ctx.fillStyle = '#475569'; 
                 ctx.fillRect(startX, beamY + thick, beamLength * PIXELS_PER_METER, thick);
-                
-                // Draw subgrade
                  ctx.fillStyle = '#0f172a';
-                 // Grid visible below
             }
 
-            // Standard Ground Line for Bridge
-            if (currentMode === 'bridge') {
+            if (activeWorkspace === 'bridge') {
                 ctx.beginPath();
                 ctx.strokeStyle = '#334155';
                 ctx.lineWidth = 1;
@@ -745,24 +760,20 @@
 
             // Draw Beam
             ctx.fillStyle = '#64748b'; 
-            if (currentMode === 'tunnel') ctx.fillStyle = '#78716c'; // Stone/Concrete color
-            if (currentMode === 'highway') ctx.fillStyle = '#1e293b'; // Asphalt color
+            if (activeWorkspace === 'tunnel') ctx.fillStyle = '#78716c';
+            if (activeWorkspace === 'highway') ctx.fillStyle = '#1e293b';
             
             ctx.fillRect(startX, beamY - 5, beamLength * PIXELS_PER_METER, 10);
             
-            // Draw Distributed Load Arrows (if significant)
+            // Draw UDL
             if (distributedLoad > 1) {
                 ctx.fillStyle = 'rgba(239, 68, 68, 0.3)';
                 const loadH = Math.min(40, distributedLoad * 2);
                 ctx.fillRect(startX, beamY - 5 - loadH, beamLength * PIXELS_PER_METER, loadH);
-                // Arrows down
                 ctx.fillStyle = 'rgba(239, 68, 68, 0.5)';
                 for(let ix = 0; ix < beamLength; ix+=2) {
                      let lx = startX + ix * PIXELS_PER_METER;
-                     ctx.beginPath();
-                     ctx.moveTo(lx, beamY - 5 - loadH);
-                     ctx.lineTo(lx, beamY - 5);
-                     ctx.stroke();
+                     ctx.beginPath(); ctx.moveTo(lx, beamY - 5 - loadH); ctx.lineTo(lx, beamY - 5); ctx.stroke();
                 }
             }
 
@@ -771,22 +782,15 @@
                 const x = startX + s.x * PIXELS_PER_METER;
                 const y = beamY + 5;
                 ctx.fillStyle = '#94a3b8';
-                ctx.beginPath();
-                ctx.moveTo(x, y);
-                ctx.lineTo(x - 10, y + 15);
-                ctx.lineTo(x + 10, y + 15);
-                ctx.closePath();
-                
+                ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 10, y + 15); ctx.lineTo(x + 10, y + 15); ctx.closePath();
                 if (selectedObject && selectedObject.obj === s) ctx.fillStyle = '#3b82f6';
                 ctx.fill();
-
                 if (reactions[s.id] && (Math.abs(reactions[s.id])/footingArea > soilCapacity)) {
-                    ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
-                    ctx.beginPath(); ctx.arc(x, y + 20, 25, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.4)'; ctx.beginPath(); ctx.arc(x, y + 20, 25, 0, Math.PI*2); ctx.fill();
                 }
             });
 
-            // Draw Loads (Point)
+            // Draw Loads
             loads.forEach(l => {
                 const x = startX + l.x * PIXELS_PER_METER;
                 const y = beamY - 5;
@@ -803,17 +807,13 @@
 
             // Diagrams
             if (showDiagrams && shearData.length > 0) {
-                // SFD
-                const sfdScale = 0.5;
-                const sfdY = midY - 80;
+                const sfdScale = 0.5; const sfdY = midY - 80;
                 ctx.beginPath(); ctx.moveTo(startX, sfdY);
                 shearData.forEach(pt => ctx.lineTo(startX + pt.x * PIXELS_PER_METER, sfdY - pt.v * sfdScale));
                 ctx.lineTo(startX + beamLength * PIXELS_PER_METER, sfdY); ctx.closePath();
                 ctx.fillStyle = 'rgba(16, 185, 129, 0.1)'; ctx.strokeStyle = 'rgba(16, 185, 129, 0.6)'; ctx.fill(); ctx.stroke();
                 
-                // BMD
-                const bmdScale = 0.5;
-                const bmdY = midY - 180;
+                const bmdScale = 0.5; const bmdY = midY - 180;
                 ctx.beginPath(); ctx.moveTo(startX, bmdY);
                 momentData.forEach(pt => ctx.lineTo(startX + pt.x * PIXELS_PER_METER, bmdY - pt.m * bmdScale));
                 ctx.lineTo(startX + beamLength * PIXELS_PER_METER, bmdY); ctx.closePath();
@@ -821,7 +821,7 @@
             }
         }
         
-        // Interaction Handlers (Mouse Down/Move/Up/DblClick) - Identical to previous version but calling updateAnalysis()
+        // --- INTERACTION (Standard) ---
         function getMousePos(evt) {
             const rect = canvas.getBoundingClientRect();
             const scaleX = canvas.width / rect.width;
@@ -833,7 +833,6 @@
                 worldX: ((evt.clientX - rect.left) * scaleX - startX) / PIXELS_PER_METER
             };
         }
-
         function handleMouseDown(e) {
             const pos = getMousePos(e);
             if (currentTool === 'load') {
@@ -853,7 +852,6 @@
             if (currentTool === 'select') {
                 const startX = (width - beamLength * PIXELS_PER_METER) / 2;
                 const beamY = height/2 + GROUND_Y_OFFSET;
-                
                 for (let l of loads) {
                     const lx = startX + l.x * PIXELS_PER_METER;
                     if (Math.abs(pos.screenX - lx) < 10 && pos.screenY < beamY) {
@@ -882,15 +880,12 @@
              if (currentTool !== 'select') return;
             const pos = getMousePos(e);
             const startX = (width - beamLength * PIXELS_PER_METER) / 2;
-            
             const loadIdx = loads.findIndex(l => Math.abs(pos.screenX - (startX + l.x * PIXELS_PER_METER)) < 15);
             if (loadIdx > -1) { loads.splice(loadIdx, 1); selectedObject = null; updateAnalysis(); updateUI(); return; }
-            
             const suppIdx = supports.findIndex(s => Math.abs(pos.screenX - (startX + s.x * PIXELS_PER_METER)) < 15);
             if (suppIdx > -1) { supports.splice(suppIdx, 1); selectedObject = null; updateAnalysis(); updateUI(); return; }
         }
 
-        // Helpers
         function updateLoadProp(v, p) { if(selectedObject?.type==='load') { if(p==='x') selectedObject.obj.x=parseFloat(v); if(p==='mag') selectedObject.obj.magnitude=parseFloat(v); updateAnalysis(); updateUI(); }}
         function updateSupportProp(v) { if(selectedObject?.type==='support') { selectedObject.obj.x=parseFloat(v); updateAnalysis(); updateUI(); }}
         function deleteSelected() { if(!selectedObject)return; if(selectedObject.type==='load') loads=loads.filter(l=>l!==selectedObject.obj); else supports=supports.filter(s=>s!==selectedObject.obj); selectedObject=null; updateAnalysis(); updateUI(); }
