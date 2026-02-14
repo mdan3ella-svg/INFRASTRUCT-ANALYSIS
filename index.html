@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INFRASTRUCT | Topology Design | Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+        
+        canvas {
+            cursor: crosshair;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .panel {
+            background: rgba(30, 41, 59, 0.95);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        .tool-btn.active {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="h-14 border-b border-slate-700 bg-slate-900 flex items-center justify-between px-4 shrink-0 z-20">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 bg-blue-600 rounded flex items-center justify-center font-bold text-white tracking-tighter">
+                IS
+            </div>
+            <div>
+                <h1 class="text-sm font-bold tracking-wide text-white">INFRASTRUCT</h1>
+                <p class="text-[10px] text-slate-400 uppercase tracking-widest">Topology Design & Analysis</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-4">
+            <div id="status-indicator" class="flex items-center gap-2 text-xs px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                SYSTEM STABLE
+            </div>
+            <button onclick="resetModel()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-600 transition">
+                Reset Model
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Sidebar: Tools -->
+        <aside class="w-16 bg-slate-800 border-r border-slate-700 flex flex-col items-center py-4 gap-4 z-10 shrink-0">
+            <div class="flex flex-col gap-2 w-full px-2">
+                <button onclick="setTool('select')" id="btn-select" class="tool-btn active w-full aspect-square rounded flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-white hover:bg-slate-700 transition" title="Select / Move">
+                    <i class="fas fa-mouse-pointer"></i>
+                    <span class="text-[9px]">EDIT</span>
+                </button>
+                <button onclick="setTool('load')" id="btn-load" class="tool-btn w-full aspect-square rounded flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-white hover:bg-slate-700 transition" title="Add Point Load">
+                    <i class="fas fa-arrow-down"></i>
+                    <span class="text-[9px]">LOAD</span>
+                </button>
+                <button onclick="setTool('support')" id="btn-support" class="tool-btn w-full aspect-square rounded flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-white hover:bg-slate-700 transition" title="Add Support">
+                    <i class="fas fa-caret-up"></i>
+                    <span class="text-[9px]">PIER</span>
+                </button>
+            </div>
+            
+            <div class="mt-auto flex flex-col gap-2 w-full px-2">
+                 <button onclick="toggleDiagrams()" class="w-full aspect-square rounded flex flex-col items-center justify-center gap-1 text-slate-400 hover:text-white hover:bg-slate-700 transition border border-slate-600" title="Toggle Diagrams">
+                    <i class="fas fa-chart-area"></i>
+                    <span class="text-[9px]">DIAG</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Center: Canvas -->
+        <main class="flex-1 relative bg-slate-900 overflow-hidden">
+            <canvas id="mainCanvas" class="w-full h-full block"></canvas>
+            
+            <!-- Overlay Info -->
+            <div class="absolute bottom-4 left-4 pointer-events-none">
+                <div class="text-[10px] text-slate-500 font-mono">
+                    GRID: 1m | SCALE: 1:100<br>
+                    SOLVER: FEM (Stiffness Matrix 1D)
+                </div>
+            </div>
+        </main>
+
+        <!-- Right Sidebar: Properties & Data -->
+        <aside class="w-80 bg-slate-900 border-l border-slate-700 flex flex-col shrink-0 overflow-y-auto z-10">
+            
+            <!-- Contextual Properties -->
+            <div class="p-4 border-b border-slate-700">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Item Properties</h2>
+                <div id="properties-panel">
+                    <p class="text-sm text-slate-500 italic">Select an element to edit properties.</p>
+                </div>
+            </div>
+
+            <!-- Survey / Geotech Data -->
+            <div class="p-4 border-b border-slate-700">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Survey & Geotech</h2>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[11px] text-slate-400 block mb-1">Soil Bearing Capacity (kN/m²)</label>
+                        <input type="number" id="soil-bearing" value="200" onchange="updateSystemParams()" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-500 transition">
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-slate-400 block mb-1">Beam Stiffness (EI)</label>
+                        <input type="number" id="beam-ei" value="20000" onchange="updateSystemParams()" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-500 transition">
+                    </div>
+                    <div>
+                        <label class="text-[11px] text-slate-400 block mb-1">Max Allowable Shear (kN)</label>
+                        <input type="number" id="max-shear" value="150" onchange="updateSystemParams()" class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-blue-500 transition">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Results -->
+            <div class="p-4 flex-1">
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Live Analysis</h2>
+                <div id="analysis-results" class="space-y-2">
+                    <!-- Dynamic Results populated by JS -->
+                </div>
+                
+                <div id="error-log" class="mt-6 p-3 bg-red-900/20 border border-red-500/30 rounded hidden">
+                    <h3 class="text-red-400 text-xs font-bold mb-1"><i class="fas fa-exclamation-triangle mr-1"></i> DESIGN ALERTS</h3>
+                    <ul id="error-list" class="text-[10px] text-red-300 space-y-1 list-disc pl-3"></ul>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // --- CONFIG & STATE ---
+        const canvas = document.getElementById('mainCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let width, height;
+        const GROUND_Y_OFFSET = 100; // Pixels from center
+        const PIXELS_PER_METER = 40;
+        
+        let currentTool = 'select'; // select, load, support
+        let selectedObject = null;
+        let isDragging = false;
+        let showDiagrams = true;
+
+        // Model Data
+        let beamLength = 20; // meters
+        let supports = [];   // { id, x (m), type: 'pin'|'roller' }
+        let loads = [];      // { id, x (m), magnitude (kN), type: 'point' }
+        
+        // System Parameters
+        let soilCapacity = 200; // kPa
+        let footingArea = 1.0;  // m^2 (assumed for simplicity per support)
+        let EI = 20000;         // kNm^2
+        let maxShearCapacity = 150; // kN
+
+        // Analysis Results
+        let reactions = {}; // map support id -> force
+        let shearData = [];
+        let momentData = [];
+        let maxDeflection = 0;
+        let designErrors = [];
+
+        // --- INITIALIZATION ---
+        function init() {
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+            
+            // Default Model: 20m beam, supports at 2m and 18m
+            resetModel();
+            
+            // Event Listeners
+            canvas.addEventListener('mousedown', handleMouseDown);
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseup', handleMouseUp);
+            canvas.addEventListener('dblclick', handleDoubleClick);
+            
+            // Start Loop
+            requestAnimationFrame(animate);
+        }
+
+        function resetModel() {
+            supports = [
+                { id: generateId(), x: 2, type: 'pin' },
+                { id: generateId(), x: 18, type: 'roller' }
+            ];
+            loads = [
+                { id: generateId(), x: 10, magnitude: 50, type: 'point' }
+            ];
+            updateAnalysis();
+            updateUI();
+        }
+
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            width = rect.width;
+            height = rect.height;
+            canvas.width = width;
+            canvas.height = height;
+            draw();
+        }
+
+        // --- SOLVER ENGINE (Simple Finite Element / Matrix Method) ---
+        // Solves a continuous beam on rigid supports
+        function updateAnalysis() {
+            // Sort supports by X
+            supports.sort((a, b) => a.x - b.x);
+            
+            // Nodes: Start(0), End(beamLength), Support locations, Load locations
+            let nodes = new Set([0, beamLength]);
+            supports.forEach(s => nodes.add(s.x));
+            loads.forEach(l => nodes.add(l.x));
+            let sortedNodes = Array.from(nodes).sort((a, b) => a - b);
+            
+            // Create Elements
+            let elements = [];
+            for (let i = 0; i < sortedNodes.length - 1; i++) {
+                elements.push({
+                    start: sortedNodes[i],
+                    end: sortedNodes[i+1],
+                    length: sortedNodes[i+1] - sortedNodes[i]
+                });
+            }
+
+            // In a truly simple visualizer for "conceptual" stages, we can use a simplified approach 
+            // of taking moments about supports. However, to handle >2 supports (indeterminate),
+            // we will use a simplified Gaussian elimination for the reaction forces if we treat it as rigid.
+            // FOR ROBUSTNESS in this lite app: We will assume the beam is rigid enough that we can
+            // treat it as a summation of simple beams or solve linear equations of equilibrium.
+            
+            // Let's implement a General 1D Beam Solver (Stiffness Method) simplified.
+            // Each node has 2 DOFs: Vertical displacement (v) and Rotation (theta).
+            // Total DOFs = nodes.length * 2.
+            
+            const nNodes = sortedNodes.length;
+            const nDof = nNodes * 2;
+            let K = new Float64Array(nDof * nDof); // Global Stiffness Matrix
+            let F = new Float64Array(nDof);        // Force Vector
+            
+            // Assemble K
+            elements.forEach((el, idx) => {
+                const L = el.length;
+                if (L < 0.001) return; // Avoid zero length
+                const k = (EI) / (L * L * L); // Simplified factor
+                
+                // Local Stiffness Matrix coefficients (Standard Beam Theory)
+                // v1, th1, v2, th2
+                const k11 = 12*k, k12 = 6*k*L, k13 = -12*k, k14 = 6*k*L;
+                const k22 = 4*k*L*L, k23 = -6*k*L, k24 = 2*k*L*L;
+                const k33 = 12*k, k34 = -6*k*L;
+                const k44 = 4*k*L*L;
+
+                // Map to global indices
+                const i1 = idx * 2;     // Node i, DOF v
+                const i2 = idx * 2 + 1; // Node i, DOF theta
+                const i3 = (idx + 1) * 2;
+                const i4 = (idx + 1) * 2 + 1;
+                
+                // Add to Global K
+                addK(K, nDof, i1, i1, k11); addK(K, nDof, i1, i2, k12); addK(K, nDof, i1, i3, k13); addK(K, nDof, i1, i4, k14);
+                addK(K, nDof, i2, i1, k12); addK(K, nDof, i2, i2, k22); addK(K, nDof, i2, i3, k23); addK(K, nDof, i2, i4, k24);
+                addK(K, nDof, i3, i1, k13); addK(K, nDof, i3, i2, k23); addK(K, nDof, i3, i3, k33); addK(K, nDof, i3, i4, k34);
+                addK(K, nDof, i4, i1, k14); addK(K, nDof, i4, i2, k24); addK(K, nDof, i4, i3, k34); addK(K, nDof, i4, i4, k44);
+            });
+
+            // Apply Loads to F
+            loads.forEach(l => {
+                const nodeIdx = sortedNodes.indexOf(l.x);
+                if (nodeIdx !== -1) {
+                    F[nodeIdx * 2] -= l.magnitude; // Downward force
+                }
+            });
+
+            // Boundary Conditions
+            // Identify constrained DOFs
+            let constrainedDofs = [];
+            supports.forEach(s => {
+                const nodeIdx = sortedNodes.indexOf(s.x);
+                if (nodeIdx !== -1) {
+                    constrainedDofs.push(nodeIdx * 2); // Vertical displacement fixed
+                }
+            });
+
+            // Solve (Penalty Method for simplicity)
+            const penalty = 1e15;
+            constrainedDofs.forEach(dof => {
+                K[dof * nDof + dof] += penalty;
+            });
+
+            // Gaussian Elimination Solver
+            const displacements = solveLinearSystem(K, F, nDof);
+            
+            // Calculate Reactions
+            // Reaction = K_original * u - F_applied (at supported nodes)
+            reactions = {};
+            supports.forEach(s => {
+                const nodeIdx = sortedNodes.indexOf(s.x);
+                const dofIndex = nodeIdx * 2;
+                
+                // Reconstruct force at this node from element stiffnesses connected to it
+                // Easier method: Reaction is approx displacement * penalty (if using penalty method)
+                // R = K_modified * u - F_applied. For the constrained dof, K ~ penalty. u ~ F/penalty.
+                // Better: Sum of forces from adjacent elements.
+                
+                // Let's compute shear forces at element ends to find diagrams and reactions
+                reactions[s.id] = -1 * displacements[dofIndex] * penalty; // Approximation from penalty method
+            });
+
+            // Generate Diagrams Data
+            shearData = [];
+            momentData = [];
+            
+            // Walk through beam to calculate V and M
+            // We'll calculate V and M at many points for smooth drawing
+            const segments = 200;
+            const dx = beamLength / segments;
+            
+            // Simple statics check for diagrams (easier than FEM back-calculation for visuals)
+            // Reaction forces are known now.
+            // V(x) = Sum(Reactions left of x) - Sum(Loads left of x)
+            // M(x) = Sum(Reaction * dist) - Sum(Load * dist)
+            
+            for (let i = 0; i <= segments; i++) {
+                const x = i * dx;
+                let V = 0;
+                let M = 0;
+                
+                // Add Supports
+                supports.forEach(s => {
+                    if (s.x <= x) {
+                        // Use calculated reaction
+                        // Note: Our penalty method reaction might be slightly negative of expected up force convention
+                        // Let's ensure reaction is positive UP.
+                        // Force in F vector was -Magnitude (Down).
+                        // Reaction should oppose net load.
+                        let R = reactions[s.id]; 
+                        V += R;
+                        M += R * (x - s.x);
+                    }
+                });
+                
+                // Add Loads
+                loads.forEach(l => {
+                    if (l.x <= x) {
+                        V -= l.magnitude;
+                        M -= l.magnitude * (x - l.x);
+                    }
+                });
+
+                shearData.push({x, v: V});
+                momentData.push({x, m: M});
+            }
+
+            checkErrors();
+        }
+
+        function checkErrors() {
+            designErrors = [];
+            
+            // Check Soil Capacity
+            supports.forEach(s => {
+                const R = reactions[s.id];
+                const stress = Math.abs(R) / footingArea; // kPa
+                if (stress > soilCapacity) {
+                    designErrors.push(`Support at ${s.x.toFixed(1)}m: Bearing Failure (${stress.toFixed(0)} > ${soilCapacity} kPa)`);
+                }
+            });
+
+            // Check Shear Capacity
+            const maxV = Math.max(...shearData.map(d => Math.abs(d.v)));
+            if (maxV > maxShearCapacity) {
+                designErrors.push(`Beam Shear Failure (${maxV.toFixed(0)} > ${maxShearCapacity} kN)`);
+            }
+
+            // Stability check (Instability usually results in NaN or infinite displacements in FEM)
+            if (supports.length < 2) {
+                designErrors.push("Instability: Less than 2 supports.");
+            }
+        }
+
+        // --- MATH HELPERS ---
+        function addK(K, N, r, c, val) {
+            K[r * N + c] += val;
+        }
+
+        function solveLinearSystem(A, b, n) {
+            // A is flattened n*n array, b is n array
+            // Returns x array
+            // Working with copies to not destroy A/b if needed, but here we don't care
+            
+            // Forward elimination
+            for (let k = 0; k < n - 1; k++) {
+                for (let i = k + 1; i < n; i++) {
+                    const factor = A[i * n + k] / A[k * n + k];
+                    for (let j = k; j < n; j++) {
+                        A[i * n + j] -= factor * A[k * n + j];
+                    }
+                    b[i] -= factor * b[k];
+                }
+            }
+            
+            // Back substitution
+            const x = new Float64Array(n);
+            for (let i = n - 1; i >= 0; i--) {
+                let sum = b[i];
+                for (let j = i + 1; j < n; j++) {
+                    sum -= A[i * n + j] * x[j];
+                }
+                x[i] = sum / A[i * n + i];
+            }
+            return x;
+        }
+
+        // --- INTERACTION ---
+        function setTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${tool}`).classList.add('active');
+            canvas.style.cursor = tool === 'select' ? 'default' : 'crosshair';
+            selectedObject = null;
+            updateUI();
+        }
+
+        function getMousePos(evt) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const screenX = (evt.clientX - rect.left) * scaleX;
+            const screenY = (evt.clientY - rect.top) * scaleY;
+            
+            // Transform to world coords (meters)
+            const midY = height / 2;
+            const startX = (width - beamLength * PIXELS_PER_METER) / 2;
+            
+            const worldX = (screenX - startX) / PIXELS_PER_METER;
+            
+            return { screenX, screenY, worldX };
+        }
+
+        function handleMouseDown(e) {
+            const pos = getMousePos(e);
+            
+            if (currentTool === 'load') {
+                if (pos.worldX >= 0 && pos.worldX <= beamLength) {
+                    loads.push({ id: generateId(), x: Number(pos.worldX.toFixed(1)), magnitude: 50, type: 'point' });
+                    updateAnalysis();
+                    updateUI();
+                    setTool('select'); // Switch back to select after adding
+                }
+                return;
+            }
+
+            if (currentTool === 'support') {
+                if (pos.worldX >= 0 && pos.worldX <= beamLength) {
+                    supports.push({ id: generateId(), x: Number(pos.worldX.toFixed(1)), type: 'pin' });
+                    updateAnalysis();
+                    updateUI();
+                    setTool('select');
+                }
+                return;
+            }
+
+            if (currentTool === 'select') {
+                // Check loads
+                for (let l of loads) {
+                    const loadScreenX = (width - beamLength * PIXELS_PER_METER) / 2 + l.x * PIXELS_PER_METER;
+                    if (Math.abs(pos.screenX - loadScreenX) < 10 && pos.screenY < height/2 + GROUND_Y_OFFSET) {
+                        selectedObject = { type: 'load', obj: l };
+                        isDragging = true;
+                        updateUI();
+                        return;
+                    }
+                }
+                // Check supports
+                for (let s of supports) {
+                    const suppScreenX = (width - beamLength * PIXELS_PER_METER) / 2 + s.x * PIXELS_PER_METER;
+                    if (Math.abs(pos.screenX - suppScreenX) < 15 && pos.screenY > height/2) {
+                        selectedObject = { type: 'support', obj: s };
+                        isDragging = true;
+                        updateUI();
+                        return;
+                    }
+                }
+                selectedObject = null;
+                updateUI();
+            }
+        }
+
+        function handleMouseMove(e) {
+            if (!isDragging || !selectedObject) return;
+            
+            const pos = getMousePos(e);
+            let newX = Math.max(0, Math.min(beamLength, pos.worldX));
+            
+            // Snap to grid (0.5m)
+            newX = Math.round(newX * 2) / 2;
+            
+            selectedObject.obj.x = newX;
+            updateAnalysis();
+        }
+
+        function handleMouseUp() {
+            isDragging = false;
+        }
+
+        function handleDoubleClick(e) {
+            if (currentTool !== 'select') return;
+            
+            const pos = getMousePos(e);
+            
+            // Remove Load?
+            const loadIdx = loads.findIndex(l => {
+                const lx = (width - beamLength * PIXELS_PER_METER) / 2 + l.x * PIXELS_PER_METER;
+                return Math.abs(pos.screenX - lx) < 15;
+            });
+            if (loadIdx > -1) {
+                loads.splice(loadIdx, 1);
+                selectedObject = null;
+                updateAnalysis();
+                updateUI();
+                return;
+            }
+
+            // Remove Support?
+            const suppIdx = supports.findIndex(s => {
+                const sx = (width - beamLength * PIXELS_PER_METER) / 2 + s.x * PIXELS_PER_METER;
+                return Math.abs(pos.screenX - sx) < 15;
+            });
+            if (suppIdx > -1) {
+                supports.splice(suppIdx, 1);
+                selectedObject = null;
+                updateAnalysis();
+                updateUI();
+                return;
+            }
+        }
+
+        // --- RENDERING ---
+        function draw() {
+            // Clear
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, width, height);
+            
+            const startX = (width - beamLength * PIXELS_PER_METER) / 2;
+            const midY = height / 2;
+            const beamY = midY + GROUND_Y_OFFSET;
+
+            // Draw Soil/Ground Line
+            ctx.beginPath();
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 1;
+            ctx.moveTo(0, beamY + 20);
+            ctx.lineTo(width, beamY + 20);
+            ctx.stroke();
+
+            // Draw Beam
+            ctx.fillStyle = '#64748b'; // Slate 500
+            ctx.fillRect(startX, beamY - 5, beamLength * PIXELS_PER_METER, 10);
+            
+            // Selection Highlight
+            if (selectedObject && selectedObject.type === 'beam') {
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(startX, beamY - 5, beamLength * PIXELS_PER_METER, 10);
+            }
+
+            // Draw Supports
+            ctx.fillStyle = '#94a3b8';
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 2;
+            supports.forEach(s => {
+                const x = startX + s.x * PIXELS_PER_METER;
+                const y = beamY + 5;
+                
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x - 10, y + 15);
+                ctx.lineTo(x + 10, y + 15);
+                ctx.closePath();
+                
+                if (selectedObject && selectedObject.obj === s) {
+                    ctx.fillStyle = '#3b82f6';
+                } else {
+                    ctx.fillStyle = '#94a3b8';
+                }
+                ctx.fill();
+                ctx.stroke();
+
+                // Draw Soil Pressure Reaction Warning if overloaded
+                if (reactions[s.id] && (reactions[s.id]/footingArea > soilCapacity)) {
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+                    ctx.beginPath();
+                    ctx.arc(x, y + 20, 20, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            });
+
+            // Draw Loads
+            loads.forEach(l => {
+                const x = startX + l.x * PIXELS_PER_METER;
+                const y = beamY - 5;
+                const arrowHeight = 40;
+                
+                ctx.strokeStyle = '#ef4444'; // Red
+                ctx.fillStyle = '#ef4444';
+                ctx.lineWidth = 2;
+                
+                // Arrow Line
+                ctx.beginPath();
+                ctx.moveTo(x, y - arrowHeight);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                
+                // Arrow Head
+                ctx.beginPath();
+                ctx.moveTo(x - 5, y - 10);
+                ctx.lineTo(x, y);
+                ctx.lineTo(x + 5, y - 10);
+                ctx.fill();
+
+                // Label
+                ctx.fillStyle = '#f87171';
+                ctx.font = '10px Inter';
+                ctx.textAlign = 'center';
+                ctx.fillText(`${l.magnitude}kN`, x, y - arrowHeight - 5);
+
+                if (selectedObject && selectedObject.obj === l) {
+                    ctx.beginPath();
+                    ctx.arc(x, y - arrowHeight, 4, 0, Math.PI*2);
+                    ctx.fillStyle = '#3b82f6';
+                    ctx.fill();
+                }
+            });
+
+            // Draw Diagrams (SFD / BMD)
+            if (showDiagrams && shearData.length > 0) {
+                // SFD
+                const sfdScale = 0.5;
+                const sfdY = midY - 100;
+                
+                ctx.beginPath();
+                ctx.moveTo(startX, sfdY);
+                shearData.forEach(pt => {
+                    ctx.lineTo(startX + pt.x * PIXELS_PER_METER, sfdY - pt.v * sfdScale);
+                });
+                ctx.lineTo(startX + beamLength * PIXELS_PER_METER, sfdY);
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.1)'; // Emerald low opacity
+                ctx.strokeStyle = 'rgba(16, 185, 129, 0.6)';
+                ctx.fill();
+                ctx.stroke();
+                
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.8)';
+                ctx.fillText("SFD (Shear)", startX - 30, sfdY);
+
+                // BMD
+                const bmdScale = 0.5;
+                const bmdY = midY - 200;
+                
+                ctx.beginPath();
+                ctx.moveTo(startX, bmdY);
+                momentData.forEach(pt => {
+                    ctx.lineTo(startX + pt.x * PIXELS_PER_METER, bmdY - pt.m * bmdScale); // Flip BMD convention? Usually +ve moment is sag (down)
+                });
+                ctx.lineTo(startX + beamLength * PIXELS_PER_METER, bmdY);
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.6)';
+                ctx.fill();
+                ctx.stroke();
+                
+                ctx.fillStyle = 'rgba(59, 130, 246, 0.8)';
+                ctx.fillText("BMD (Moment)", startX - 30, bmdY);
+            }
+        }
+
+        function animate() {
+            draw();
+            requestAnimationFrame(animate);
+        }
+
+        // --- UI UPDATES ---
+        function updateUI() {
+            const panel = document.getElementById('properties-panel');
+            const analysisPanel = document.getElementById('analysis-results');
+            const errorPanel = document.getElementById('error-log');
+            const errorList = document.getElementById('error-list');
+            const statusInd = document.getElementById('status-indicator');
+
+            // Properties
+            if (selectedObject) {
+                if (selectedObject.type === 'load') {
+                    panel.innerHTML = `
+                        <div class="space-y-2">
+                            <div class="text-[10px] text-blue-400 font-bold">POINT LOAD SELECTED</div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">Position (m)</label>
+                                <input type="number" step="0.5" value="${selectedObject.obj.x}" 
+                                    onchange="updateLoadProp(this.value, 'x')" 
+                                    class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">Magnitude (kN)</label>
+                                <input type="number" step="10" value="${selectedObject.obj.magnitude}" 
+                                    onchange="updateLoadProp(this.value, 'mag')"
+                                    class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs">
+                            </div>
+                            <button onclick="deleteSelected()" class="w-full bg-red-900/30 text-red-400 border border-red-900/50 rounded py-1 text-xs hover:bg-red-900/50 mt-2">Delete Load</button>
+                        </div>
+                    `;
+                } else if (selectedObject.type === 'support') {
+                     panel.innerHTML = `
+                        <div class="space-y-2">
+                            <div class="text-[10px] text-blue-400 font-bold">SUPPORT SELECTED</div>
+                            <div>
+                                <label class="text-[10px] text-slate-400">Position (m)</label>
+                                <input type="number" step="0.5" value="${selectedObject.obj.x}" 
+                                    onchange="updateSupportProp(this.value)"
+                                    class="w-full bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs">
+                            </div>
+                            <div class="text-[10px] text-slate-500 mt-2">Reaction: <span class="text-white mono">${(reactions[selectedObject.obj.id] || 0).toFixed(2)} kN</span></div>
+                            <button onclick="deleteSelected()" class="w-full bg-red-900/30 text-red-400 border border-red-900/50 rounded py-1 text-xs hover:bg-red-900/50 mt-2">Remove Pier</button>
+                        </div>
+                    `;
+                }
+            } else {
+                panel.innerHTML = `<p class="text-sm text-slate-500 italic">Select an element on the diagram to edit properties.</p>`;
+            }
+
+            // Analysis
+            let maxM = 0;
+            if(momentData.length) maxM = Math.max(...momentData.map(d => Math.abs(d.m)));
+            
+            let maxV = 0;
+            if(shearData.length) maxV = Math.max(...shearData.map(d => Math.abs(d.v)));
+
+            analysisPanel.innerHTML = `
+                <div class="grid grid-cols-2 gap-2 text-xs mb-3">
+                    <div class="bg-slate-800 p-2 rounded">
+                        <div class="text-slate-400 text-[10px]">MAX MOMENT</div>
+                        <div class="text-blue-400 font-mono">${maxM.toFixed(1)} kNm</div>
+                    </div>
+                    <div class="bg-slate-800 p-2 rounded">
+                        <div class="text-slate-400 text-[10px]">MAX SHEAR</div>
+                        <div class="${maxV > maxShearCapacity ? 'text-red-400' : 'text-emerald-400'} font-mono">${maxV.toFixed(1)} kN</div>
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <div class="flex justify-between text-[11px] border-b border-slate-800 pb-1">
+                        <span class="text-slate-500">Supports</span>
+                        <span class="text-slate-300">${supports.length}</span>
+                    </div>
+                    <div class="flex justify-between text-[11px] border-b border-slate-800 pb-1">
+                        <span class="text-slate-500">Total Load</span>
+                        <span class="text-slate-300">${loads.reduce((a,b)=>a+b.magnitude,0)} kN</span>
+                    </div>
+                </div>
+            `;
+
+            // Errors
+            if (designErrors.length > 0) {
+                errorPanel.classList.remove('hidden');
+                errorList.innerHTML = designErrors.map(e => `<li>${e}</li>`).join('');
+                
+                statusInd.className = "flex items-center gap-2 text-xs px-3 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/20";
+                statusInd.innerHTML = `<span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> CRITICAL`;
+            } else {
+                errorPanel.classList.add('hidden');
+                statusInd.className = "flex items-center gap-2 text-xs px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                statusInd.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> SYSTEM STABLE`;
+            }
+        }
+
+        function updateSystemParams() {
+            soilCapacity = parseFloat(document.getElementById('soil-bearing').value);
+            EI = parseFloat(document.getElementById('beam-ei').value);
+            maxShearCapacity = parseFloat(document.getElementById('max-shear').value);
+            updateAnalysis();
+            updateUI();
+        }
+
+        function updateLoadProp(val, prop) {
+            if (!selectedObject || selectedObject.type !== 'load') return;
+            if (prop === 'x') selectedObject.obj.x = parseFloat(val);
+            if (prop === 'mag') selectedObject.obj.magnitude = parseFloat(val);
+            updateAnalysis();
+            updateUI();
+        }
+
+        function updateSupportProp(val) {
+            if (!selectedObject || selectedObject.type !== 'support') return;
+            selectedObject.obj.x = parseFloat(val);
+            updateAnalysis();
+            updateUI();
+        }
+
+        function deleteSelected() {
+            if (!selectedObject) return;
+            if (selectedObject.type === 'load') {
+                loads = loads.filter(l => l !== selectedObject.obj);
+            } else if (selectedObject.type === 'support') {
+                supports = supports.filter(s => s !== selectedObject.obj);
+            }
+            selectedObject = null;
+            updateAnalysis();
+            updateUI();
+        }
+
+        function toggleDiagrams() {
+            showDiagrams = !showDiagrams;
+            draw();
+        }
+
+        function generateId() {
+            return Math.random().toString(36).substr(2, 9);
+        }
+
+        // Run
+        init();
+
+    </script>
+</body>
+</html>
